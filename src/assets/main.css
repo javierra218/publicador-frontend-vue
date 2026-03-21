@@ -1,0 +1,18 @@
+@import './base.css';
+
+#app {
+  width: min(1240px, 100% - 2rem);
+  margin: 1.2rem auto 1.8rem;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+@media (max-width: 920px) {
+  #app {
+    width: min(1240px, 100% - 1rem);
+    margin: 0.45rem auto 0.9rem;
+  }
+}
