@@ -31,7 +31,7 @@ export type ConfiguracionTelegramSetting = {
   chat_id: string
   bot_source: 'default' | 'legacy-default' | 'legacy' | 'missing'
   is_publishable: boolean
-  access_mode: 'all' | 'restricted'
+  access_mode: 'admin_only' | 'restricted'
   assigned_users: TelegramUserOption[]
   createdAt: string | null
   updatedAt: string | null

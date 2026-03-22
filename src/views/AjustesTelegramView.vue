@@ -357,7 +357,7 @@ const handleSaveAccess = async () => {
     result.value =
       updated.access_mode === 'restricted'
         ? 'Permisos de chat actualizados correctamente.'
-        : 'El chat quedó disponible para todos los usuarios autenticados.'
+        : 'El chat quedó visible solo para administradores hasta asignarlo a usuarios.'
   } catch (err) {
     error.value = err instanceof Error ? err.message : 'Error desconocido guardando permisos del chat.'
   } finally {
@@ -541,7 +541,7 @@ onMounted(loadAjustes)
           <h3>Permisos por usuario</h3>
           <p>
             Elige qué usuarios pueden publicar en un chat. Si no seleccionas ninguno, el chat queda
-            disponible para todos.
+            visible solo para administradores.
           </p>
         </div>
       </div>
@@ -573,7 +573,9 @@ onMounted(loadAjustes)
 
       <p v-if="selectedAccessConfig" class="helper-text">
         Estado actual:
-        <strong>{{ selectedAccessConfig.access_mode === 'restricted' ? 'restringido' : 'abierto' }}</strong>
+        <strong>{{
+          selectedAccessConfig.access_mode === 'restricted' ? 'restringido' : 'solo admins'
+        }}</strong>
       </p>
 
       <div v-if="users.length" class="access-users">
@@ -652,7 +654,7 @@ onMounted(loadAjustes)
 
       <Column header="Usuarios">
         <template #body="{ data }">
-          <span v-if="data.access_mode === 'all'" class="muted">Todos</span>
+          <span v-if="data.access_mode === 'admin_only'" class="muted">Solo admins</span>
           <span v-else class="muted">
             {{ formatAssignedUsers(data.assigned_users) }}
           </span>

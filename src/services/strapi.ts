@@ -199,7 +199,10 @@ const mapConfiguracionTelegramSetting = (entity: unknown): ConfiguracionTelegram
         ? raw.bot_source
         : 'missing',
     is_publishable: Boolean(raw.is_publishable),
-    access_mode: raw.access_mode === 'restricted' ? 'restricted' : 'all',
+    access_mode:
+      raw.access_mode === 'restricted' || raw.access_mode === 'admin_only'
+        ? raw.access_mode
+        : 'admin_only',
     assigned_users: Array.isArray(raw.assigned_users)
       ? raw.assigned_users.map((item) => mapTelegramUserOption(item)).filter((item) => item.id > 0)
       : [],
@@ -525,7 +528,10 @@ export const updateTelegramConfigUsers = async (
 
   return {
     id: ensureNumber(raw.id),
-    access_mode: raw.access_mode === 'restricted' ? 'restricted' : 'all',
+    access_mode:
+      raw.access_mode === 'restricted' || raw.access_mode === 'admin_only'
+        ? raw.access_mode
+        : 'admin_only',
     assigned_users: Array.isArray(raw.assigned_users)
       ? raw.assigned_users.map((item) => mapTelegramUserOption(item)).filter((item) => item.id > 0)
       : [],
