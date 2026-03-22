@@ -5,22 +5,31 @@ import Button from 'primevue/button'
 import Message from 'primevue/message'
 
 import CategoriaForm from '@/components/CategoriaForm.vue'
-import { fetchCategoriaByDocumentId, updateCategoria } from '@/services/strapi'
-import type { Categoria, CategoriaUpsertInput } from '@/types/producto'
+import { useAuthStore } from '@/stores/auth'
+import {
+  assignCategoriaUsers,
+  fetchCategoriaByDocumentId,
+  fetchTelegramUserOptions,
+  updateCategoria,
+} from '@/services/strapi'
+import type { Categoria, CategoriaUpsertInput, FrontendUserOption } from '@/types/producto'
 
 const route = useRoute()
 const router = useRouter()
+const auth = useAuthStore()
 
 const loading = ref(false)
 const isSaving = ref(false)
 const error = ref('')
 const result = ref('')
 const categoria = ref<Categoria | null>(null)
+const userOptions = ref<FrontendUserOption[]>([])
 
 const documentId = computed(() => String(route.params.documentId ?? ''))
 const initialValues = computed(() => ({
   nombre: categoria.value?.nombre ?? '',
   slug: categoria.value?.slug ?? '',
+  assignedUserIds: categoria.value?.assignedUsers.map((user) => user.id) ?? [],
 }))
 
 const loadCategoria = async () => {
@@ -28,7 +37,16 @@ const loadCategoria = async () => {
   error.value = ''
 
   try {
-    categoria.value = await fetchCategoriaByDocumentId(documentId.value)
+    const [loadedCategoria, loadedUsers] = await Promise.all([
+      fetchCategoriaByDocumentId(documentId.value, {
+        includeAssignedUsers: auth.isFrontendAdmin,
+      }),
+      auth.isFrontendAdmin ? fetchTelegramUserOptions() : Promise.resolve([]),
+    ])
+
+    categoria.value = loadedCategoria
+    userOptions.value = loadedUsers
+
     if (!categoria.value) {
       error.value = 'Categoría no encontrada para el documentId indicado.'
     }
@@ -46,6 +64,11 @@ const handleSubmit = async (payload: CategoriaUpsertInput) => {
 
   try {
     await updateCategoria(documentId.value, payload)
+
+    if (auth.isFrontendAdmin) {
+      await assignCategoriaUsers(documentId.value, payload.assignedUserIds)
+    }
+
     result.value = 'Categoría actualizada correctamente.'
     await loadCategoria()
   } catch (err) {
@@ -90,6 +113,8 @@ watch(documentId, loadCategoria, { immediate: true })
         submit-label="Guardar cambios"
         :submitting="isSaving"
         secondary-label="Cancelar"
+        :show-access-controls="auth.isFrontendAdmin"
+        :user-options="userOptions"
         @submit="handleSubmit"
         @secondary="goBackToList"
       />

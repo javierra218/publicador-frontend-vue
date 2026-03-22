@@ -5,11 +5,20 @@ export type ProductoArchivo = {
   name: string | null
 }
 
+export type FrontendUserOption = {
+  id: number
+  username: string
+  email: string
+}
+
+export type TelegramUserOption = FrontendUserOption
+
 export type Categoria = {
   id: number
   documentId: string
   nombre: string
   slug: string
+  assignedUsers: FrontendUserOption[]
 }
 
 export type ConfiguracionTelegramOption = {
@@ -17,12 +26,6 @@ export type ConfiguracionTelegramOption = {
   nombre: string
   chat_id: string
   label: string
-}
-
-export type TelegramUserOption = {
-  id: number
-  username: string
-  email: string
 }
 
 export type ConfiguracionTelegramSetting = {
@@ -69,6 +72,7 @@ export type Producto = {
   previewImagenMime: string | null
   previewImagenName: string | null
   archivos: ProductoArchivo[]
+  assignedUsers: FrontendUserOption[]
 }
 
 export type PublicarResponse = {
@@ -108,6 +112,7 @@ export type PublicarMasivoResponse = {
 export type CategoriaUpsertInput = {
   nombre: string
   slug: string
+  assignedUserIds: number[]
 }
 
 export type ProductoUpsertInput = {
@@ -120,4 +125,5 @@ export type ProductoUpsertInput = {
   archivosFiles: File[]
   clearPreview: boolean
   clearArchivos: boolean
+  assignedUserIds: number[]
 }

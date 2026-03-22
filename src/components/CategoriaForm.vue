@@ -4,11 +4,13 @@ import Button from 'primevue/button'
 import InputText from 'primevue/inputtext'
 import Message from 'primevue/message'
 
-import type { CategoriaUpsertInput } from '@/types/producto'
+import AccessUsersFieldset from '@/components/AccessUsersFieldset.vue'
+import type { CategoriaUpsertInput, FrontendUserOption } from '@/types/producto'
 
 type CategoriaFormValues = {
   nombre: string
   slug: string
+  assignedUserIds: number[]
 }
 
 const props = withDefaults(
@@ -17,15 +19,20 @@ const props = withDefaults(
     submitLabel?: string
     submitting?: boolean
     secondaryLabel?: string
+    showAccessControls?: boolean
+    userOptions?: FrontendUserOption[]
   }>(),
   {
     initialValues: () => ({
       nombre: '',
       slug: '',
+      assignedUserIds: [],
     }),
     submitLabel: 'Guardar',
     submitting: false,
     secondaryLabel: '',
+    showAccessControls: false,
+    userOptions: () => [],
   },
 )
 
@@ -37,6 +44,7 @@ const emit = defineEmits<{
 const form = reactive<CategoriaUpsertInput>({
   nombre: '',
   slug: '',
+  assignedUserIds: [],
 })
 
 const localError = reactive({
@@ -46,6 +54,7 @@ const localError = reactive({
 const applyInitialValues = () => {
   form.nombre = props.initialValues.nombre
   form.slug = props.initialValues.slug
+  form.assignedUserIds = [...props.initialValues.assignedUserIds]
   localError.message = ''
 }
 
@@ -64,6 +73,7 @@ const handleSubmit = () => {
   emit('submit', {
     nombre,
     slug,
+    assignedUserIds: [...form.assignedUserIds],
   })
 }
 </script>
@@ -88,6 +98,15 @@ const handleSubmit = () => {
       />
       <small class="hint">Si lo dejas vacío, se genera a partir del nombre.</small>
     </label>
+
+    <AccessUsersFieldset
+      v-if="showAccessControls"
+      v-model="form.assignedUserIds"
+      :users="userOptions"
+      :disabled="submitting"
+      title="Usuarios con acceso"
+      hint="Si no seleccionas usuarios, esta categoría quedará visible solo para administradores del frontend."
+    />
 
     <div class="actions">
       <Button type="submit" :label="submitLabel" :loading="submitting" />

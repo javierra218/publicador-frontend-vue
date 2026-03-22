@@ -5,11 +5,19 @@ import Button from 'primevue/button'
 import Message from 'primevue/message'
 
 import ProductoForm from '@/components/ProductoForm.vue'
-import { fetchCategorias, fetchProductoByDocumentId, updateProducto } from '@/services/strapi'
-import type { Categoria, Producto, ProductoUpsertInput } from '@/types/producto'
+import { useAuthStore } from '@/stores/auth'
+import {
+  assignProductoUsers,
+  fetchCategorias,
+  fetchProductoByDocumentId,
+  fetchTelegramUserOptions,
+  updateProducto,
+} from '@/services/strapi'
+import type { Categoria, FrontendUserOption, Producto, ProductoUpsertInput } from '@/types/producto'
 
 const route = useRoute()
 const router = useRouter()
+const auth = useAuthStore()
 
 const loading = ref(false)
 const isSaving = ref(false)
@@ -17,6 +25,7 @@ const error = ref('')
 const result = ref('')
 const producto = ref<Producto | null>(null)
 const categorias = ref<Categoria[]>([])
+const userOptions = ref<FrontendUserOption[]>([])
 
 const documentId = computed(() => String(route.params.documentId ?? ''))
 const initialValues = computed(() => ({
@@ -24,6 +33,7 @@ const initialValues = computed(() => ({
   descripcion: producto.value?.descripcion ?? '',
   precio: producto.value?.precio ?? '',
   categoriaId: producto.value?.categoria?.id ?? null,
+  assignedUserIds: producto.value?.assignedUsers.map((user) => user.id) ?? [],
 }))
 
 const loadProductoAndCategorias = async () => {
@@ -31,13 +41,17 @@ const loadProductoAndCategorias = async () => {
   error.value = ''
 
   try {
-    const [loadedProducto, loadedCategorias] = await Promise.all([
-      fetchProductoByDocumentId(documentId.value),
+    const [loadedProducto, loadedCategorias, loadedUsers] = await Promise.all([
+      fetchProductoByDocumentId(documentId.value, {
+        includeAssignedUsers: auth.isFrontendAdmin,
+      }),
       fetchCategorias(),
+      auth.isFrontendAdmin ? fetchTelegramUserOptions() : Promise.resolve([]),
     ])
 
     producto.value = loadedProducto
     categorias.value = loadedCategorias
+    userOptions.value = loadedUsers
 
     if (!producto.value) {
       error.value = 'Producto no encontrado para el documentId indicado.'
@@ -61,6 +75,11 @@ const handleSubmit = async (payload: ProductoUpsertInput) => {
 
   try {
     await updateProducto(documentId.value, payload)
+
+    if (auth.isFrontendAdmin) {
+      await assignProductoUsers(documentId.value, payload.assignedUserIds)
+    }
+
     result.value = 'Producto actualizado correctamente.'
     await loadProductoAndCategorias()
   } catch (err) {
@@ -107,6 +126,8 @@ watch(documentId, loadProductoAndCategorias, { immediate: true })
         :current-preview-mime="producto.previewImagenMime"
         :current-preview-name="producto.previewImagenName"
         :current-archivos="producto.archivos"
+        :show-access-controls="auth.isFrontendAdmin"
+        :user-options="userOptions"
         submit-label="Guardar cambios"
         :submitting="isSaving"
         :show-clear-options="true"

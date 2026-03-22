@@ -5,19 +5,33 @@ import Button from 'primevue/button'
 import Message from 'primevue/message'
 
 import ProductoForm from '@/components/ProductoForm.vue'
-import { createProducto, fetchCategorias } from '@/services/strapi'
-import type { Categoria, ProductoUpsertInput } from '@/types/producto'
+import { useAuthStore } from '@/stores/auth'
+import {
+  assignProductoUsers,
+  createProducto,
+  fetchCategorias,
+  fetchTelegramUserOptions,
+} from '@/services/strapi'
+import type { Categoria, FrontendUserOption, ProductoUpsertInput } from '@/types/producto'
 
 const router = useRouter()
+const auth = useAuthStore()
 const isSaving = ref(false)
 const error = ref('')
 const result = ref('')
 const formVersion = ref(0)
 const categorias = ref<Categoria[]>([])
+const userOptions = ref<FrontendUserOption[]>([])
 
 const loadCategorias = async () => {
   try {
-    categorias.value = await fetchCategorias()
+    const [loadedCategorias, loadedUsers] = await Promise.all([
+      fetchCategorias(),
+      auth.isFrontendAdmin ? fetchTelegramUserOptions() : Promise.resolve([]),
+    ])
+
+    categorias.value = loadedCategorias
+    userOptions.value = loadedUsers
   } catch (err) {
     error.value = err instanceof Error ? err.message : 'Error desconocido cargando categorías.'
   }
@@ -38,7 +52,12 @@ const handleSubmit = async (payload: ProductoUpsertInput) => {
   result.value = ''
 
   try {
-    await createProducto(payload)
+    const created = await createProducto(payload)
+
+    if (auth.isFrontendAdmin && payload.assignedUserIds.length > 0) {
+      await assignProductoUsers(created.documentId, payload.assignedUserIds)
+    }
+
     result.value = 'Producto creado correctamente.'
     formVersion.value += 1
   } catch (err) {
@@ -77,6 +96,8 @@ onMounted(loadCategorias)
       <ProductoForm
         :key="formVersion"
         :categorias="categorias"
+        :show-access-controls="auth.isFrontendAdmin"
+        :user-options="userOptions"
         submit-label="Crear producto"
         :submitting="isSaving"
         @submit="handleSubmit"

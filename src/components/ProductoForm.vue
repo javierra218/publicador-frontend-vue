@@ -7,13 +7,20 @@ import Message from 'primevue/message'
 import Select from 'primevue/select'
 import Textarea from 'primevue/textarea'
 
-import type { Categoria, ProductoArchivo, ProductoUpsertInput } from '@/types/producto'
+import AccessUsersFieldset from '@/components/AccessUsersFieldset.vue'
+import type {
+  Categoria,
+  FrontendUserOption,
+  ProductoArchivo,
+  ProductoUpsertInput,
+} from '@/types/producto'
 
 type ProductoFormValues = {
   nombre: string
   descripcion: string
   precio: string
   categoriaId: number | null
+  assignedUserIds: number[]
 }
 
 const props = withDefaults(
@@ -24,6 +31,8 @@ const props = withDefaults(
     showClearOptions?: boolean
     secondaryLabel?: string
     categorias?: Categoria[]
+    showAccessControls?: boolean
+    userOptions?: FrontendUserOption[]
     currentPreviewUrl?: string | null
     currentPreviewMime?: string | null
     currentPreviewName?: string | null
@@ -35,12 +44,15 @@ const props = withDefaults(
       descripcion: '',
       precio: '',
       categoriaId: null,
+      assignedUserIds: [],
     }),
     submitLabel: 'Guardar',
     submitting: false,
     showClearOptions: false,
     secondaryLabel: '',
     categorias: () => [],
+    showAccessControls: false,
+    userOptions: () => [],
     currentPreviewUrl: null,
     currentPreviewMime: null,
     currentPreviewName: null,
@@ -67,6 +79,7 @@ const form = reactive<ProductoUpsertInput>({
   archivosFiles: [],
   clearPreview: false,
   clearArchivos: false,
+  assignedUserIds: [],
 })
 
 const formatBytes = (bytes: number): string => {
@@ -152,6 +165,7 @@ const applyInitialValues = () => {
   form.descripcion = props.initialValues.descripcion
   form.precio = props.initialValues.precio
   form.categoriaId = props.initialValues.categoriaId
+  form.assignedUserIds = [...props.initialValues.assignedUserIds]
   form.existingArchivosIds = props.currentArchivos.map((archivo) => archivo.id)
   form.previewFile = null
   form.archivosFiles = []
@@ -245,6 +259,7 @@ const handleSubmit = () => {
     archivosFiles: [...form.archivosFiles],
     clearPreview: form.clearPreview,
     clearArchivos: form.clearArchivos,
+    assignedUserIds: [...form.assignedUserIds],
   })
 }
 
@@ -299,6 +314,15 @@ const handleSecondary = () => {
         />
       </label>
     </section>
+
+    <AccessUsersFieldset
+      v-if="showAccessControls"
+      v-model="form.assignedUserIds"
+      :users="userOptions"
+      :disabled="submitting"
+      title="Usuarios con acceso"
+      hint="Si no seleccionas usuarios, este producto quedará visible solo para administradores del frontend."
+    />
 
     <section v-if="hasCurrentMedia" class="current-media">
       <article v-if="visibleCurrentPreviewUrl" class="current-card">

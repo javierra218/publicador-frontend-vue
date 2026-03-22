@@ -1,18 +1,38 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import Button from 'primevue/button'
 import Message from 'primevue/message'
 
 import CategoriaForm from '@/components/CategoriaForm.vue'
-import { createCategoria } from '@/services/strapi'
-import type { CategoriaUpsertInput } from '@/types/producto'
+import { useAuthStore } from '@/stores/auth'
+import {
+  assignCategoriaUsers,
+  createCategoria,
+  fetchTelegramUserOptions,
+} from '@/services/strapi'
+import type { CategoriaUpsertInput, FrontendUserOption } from '@/types/producto'
 
 const router = useRouter()
+const auth = useAuthStore()
 const isSaving = ref(false)
 const error = ref('')
 const result = ref('')
 const formVersion = ref(0)
+const userOptions = ref<FrontendUserOption[]>([])
+
+const loadUsers = async () => {
+  if (!auth.isFrontendAdmin) {
+    userOptions.value = []
+    return
+  }
+
+  try {
+    userOptions.value = await fetchTelegramUserOptions()
+  } catch (err) {
+    error.value = err instanceof Error ? err.message : 'Error desconocido cargando usuarios.'
+  }
+}
 
 const goToList = () => {
   router.push({ name: 'categorias-list' })
@@ -24,7 +44,12 @@ const handleSubmit = async (payload: CategoriaUpsertInput) => {
   result.value = ''
 
   try {
-    await createCategoria(payload)
+    const created = await createCategoria(payload)
+
+    if (auth.isFrontendAdmin && payload.assignedUserIds.length > 0) {
+      await assignCategoriaUsers(created.documentId, payload.assignedUserIds)
+    }
+
     result.value = 'Categoría creada correctamente.'
     formVersion.value += 1
   } catch (err) {
@@ -33,6 +58,8 @@ const handleSubmit = async (payload: CategoriaUpsertInput) => {
     isSaving.value = false
   }
 }
+
+onMounted(loadUsers)
 </script>
 
 <template>
@@ -60,6 +87,8 @@ const handleSubmit = async (payload: CategoriaUpsertInput) => {
         :key="formVersion"
         submit-label="Crear categoría"
         :submitting="isSaving"
+        :show-access-controls="auth.isFrontendAdmin"
+        :user-options="userOptions"
         @submit="handleSubmit"
       />
     </section>

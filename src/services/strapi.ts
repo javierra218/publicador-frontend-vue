@@ -4,6 +4,7 @@ import type {
   ConfiguracionTelegramCreateInput,
   ConfiguracionTelegramOption,
   ConfiguracionTelegramSetting,
+  FrontendUserOption,
   Producto,
   ProductoUpsertInput,
   PublicarMasivoResponse,
@@ -119,6 +120,22 @@ const unwrapMediaArray = (value: unknown): MediaShape[] => {
   return single ? [single] : []
 }
 
+const unwrapEntityArray = (value: unknown): AnyRecord[] => {
+  if (!value || typeof value !== 'object') return []
+
+  const root = value as AnyRecord
+
+  if (Array.isArray(root.data)) {
+    return root.data.map(unwrapEntity).filter((entity) => Object.keys(entity).length > 0)
+  }
+
+  if (Array.isArray(value)) {
+    return value.map(unwrapEntity).filter((entity) => Object.keys(entity).length > 0)
+  }
+
+  return []
+}
+
 const resolveMediaUrl = (rawUrl: string): string => {
   if (!rawUrl) return ''
   if (/^https?:\/\//i.test(rawUrl)) return rawUrl
@@ -144,6 +161,7 @@ const mapProducto = (entity: unknown): Producto => {
             documentId: ensureString(rawCategoria.documentId),
             nombre: ensureString(rawCategoria.nombre),
             slug: ensureString(rawCategoria.slug),
+            assignedUsers: [],
           }
         : null,
     previewImagenId: rawPreview?.id ? ensureNumber(rawPreview.id) : null,
@@ -159,6 +177,9 @@ const mapProducto = (entity: unknown): Producto => {
         name: file.name ?? null,
       }))
       .filter((file) => file.id > 0),
+    assignedUsers: unwrapEntityArray(raw.usuarios_permitidos)
+      .map(mapFrontendUserOption)
+      .filter((item) => item.id > 0),
   }
 }
 
@@ -170,6 +191,9 @@ const mapCategoria = (entity: unknown): Categoria => {
     documentId: ensureString(raw.documentId),
     nombre: ensureString(raw.nombre) || '(Sin nombre)',
     slug: ensureString(raw.slug),
+    assignedUsers: unwrapEntityArray(raw.usuarios_permitidos)
+      .map(mapFrontendUserOption)
+      .filter((item) => item.id > 0),
   }
 }
 
@@ -211,7 +235,7 @@ const mapConfiguracionTelegramSetting = (entity: unknown): ConfiguracionTelegram
   }
 }
 
-const mapTelegramUserOption = (entity: unknown): TelegramUserOption => {
+const mapFrontendUserOption = (entity: unknown): FrontendUserOption => {
   const raw = unwrapEntity(entity)
 
   return {
@@ -220,6 +244,8 @@ const mapTelegramUserOption = (entity: unknown): TelegramUserOption => {
     email: ensureString(raw.email),
   }
 }
+
+const mapTelegramUserOption = (entity: unknown): TelegramUserOption => mapFrontendUserOption(entity)
 
 const mapTelegramBotSetting = (entity: unknown): TelegramBotSetting => {
   const raw = unwrapEntity(entity)
@@ -342,10 +368,13 @@ export const fetchProductos = async (): Promise<Producto[]> => {
   return data.map(mapProducto).filter((item) => item.id > 0)
 }
 
-export const fetchCategorias = async (): Promise<Categoria[]> => {
+export const fetchCategorias = async (options?: { includeAssignedUsers?: boolean }): Promise<Categoria[]> => {
   const params = new URLSearchParams()
   params.append('sort[0]', 'nombre:asc')
   params.append('pagination[pageSize]', '200')
+  if (options?.includeAssignedUsers) {
+    params.append('populate[0]', 'usuarios_permitidos')
+  }
 
   const response = await fetch(`${BASE_URL}/api/categorias?${params.toString()}`, {
     headers: {
@@ -552,7 +581,10 @@ export const deleteTelegramSetting = async (id: number): Promise<void> => {
   }
 }
 
-export const fetchCategoriaByDocumentId = async (documentId: string): Promise<Categoria | null> => {
+export const fetchCategoriaByDocumentId = async (
+  documentId: string,
+  options?: { includeAssignedUsers?: boolean },
+): Promise<Categoria | null> => {
   const normalizedId = documentId.trim()
   if (!normalizedId) {
     return null
@@ -561,6 +593,9 @@ export const fetchCategoriaByDocumentId = async (documentId: string): Promise<Ca
   const params = new URLSearchParams()
   params.append('filters[documentId][$eq]', normalizedId)
   params.append('pagination[pageSize]', '1')
+  if (options?.includeAssignedUsers) {
+    params.append('populate[0]', 'usuarios_permitidos')
+  }
 
   const response = await fetch(`${BASE_URL}/api/categorias?${params.toString()}`, {
     headers: {
@@ -584,17 +619,36 @@ export const fetchCategoriaByDocumentId = async (documentId: string): Promise<Ca
   return mapped.id > 0 ? mapped : null
 }
 
-const toCategoriaData = (input: CategoriaUpsertInput): Record<string, unknown> => {
-  const nombre = input.nombre.trim()
-  const providedSlug = input.slug.trim()
+export const assignCategoriaUsers = async (documentId: string, userIds: number[]): Promise<void> => {
+  const response = await fetch(`${BASE_URL}/api/categorias/${encodeURIComponent(documentId)}/users`, {
+    method: 'PUT',
+    headers: {
+      'Content-Type': 'application/json',
+      ...getStrapiAuthHeaders(),
+    },
+    body: JSON.stringify({
+      userIds: [...new Set(userIds)].filter((id) => Number.isInteger(id) && id > 0),
+    }),
+  })
 
-  return {
-    nombre,
-    slug: providedSlug || slugify(nombre),
+  if (!response.ok) {
+    const detail = await parseStrapiErrorResponse(response)
+    throw new Error(`No se pudieron guardar los usuarios de la categoría: ${detail}`)
   }
 }
 
-export const createCategoria = async (input: CategoriaUpsertInput): Promise<void> => {
+const toCategoriaData = (input: CategoriaUpsertInput): Record<string, unknown> => {
+  const nombre = input.nombre.trim()
+  const providedSlug = input.slug.trim()
+  const data: Record<string, unknown> = {
+    nombre,
+    slug: providedSlug || slugify(nombre),
+  }
+
+  return data
+}
+
+export const createCategoria = async (input: CategoriaUpsertInput): Promise<Categoria> => {
   const response = await fetch(`${BASE_URL}/api/categorias`, {
     method: 'POST',
     headers: {
@@ -608,6 +662,15 @@ export const createCategoria = async (input: CategoriaUpsertInput): Promise<void
     const detail = await parseStrapiErrorResponse(response)
     throw new Error(`No se pudo crear la categoría: ${detail}`)
   }
+
+  const json = (await response.json()) as { data?: unknown }
+  const created = mapCategoria(json.data)
+
+  if (created.id <= 0) {
+    throw new Error('La categoría creada devolvió una respuesta inválida.')
+  }
+
+  return created
 }
 
 export const updateCategoria = async (
@@ -643,7 +706,10 @@ export const deleteCategoria = async (documentId: string): Promise<void> => {
   }
 }
 
-export const fetchProductoByDocumentId = async (documentId: string): Promise<Producto | null> => {
+export const fetchProductoByDocumentId = async (
+  documentId: string,
+  options?: { includeAssignedUsers?: boolean },
+): Promise<Producto | null> => {
   const normalizedId = documentId.trim()
   if (!normalizedId) {
     return null
@@ -653,6 +719,9 @@ export const fetchProductoByDocumentId = async (documentId: string): Promise<Pro
   params.append('populate[0]', 'preview_imagen')
   params.append('populate[1]', 'archivos')
   params.append('populate[2]', 'categoria')
+  if (options?.includeAssignedUsers) {
+    params.append('populate[3]', 'usuarios_permitidos')
+  }
   params.append('filters[documentId][$eq]', normalizedId)
   params.append('pagination[pageSize]', '1')
 
@@ -678,7 +747,25 @@ export const fetchProductoByDocumentId = async (documentId: string): Promise<Pro
   return mapped.id > 0 ? mapped : null
 }
 
-export const createProducto = async (input: ProductoUpsertInput): Promise<void> => {
+export const assignProductoUsers = async (documentId: string, userIds: number[]): Promise<void> => {
+  const response = await fetch(`${BASE_URL}/api/productos/${encodeURIComponent(documentId)}/users`, {
+    method: 'PUT',
+    headers: {
+      'Content-Type': 'application/json',
+      ...getStrapiAuthHeaders(),
+    },
+    body: JSON.stringify({
+      userIds: [...new Set(userIds)].filter((id) => Number.isInteger(id) && id > 0),
+    }),
+  })
+
+  if (!response.ok) {
+    const detail = await parseStrapiErrorResponse(response)
+    throw new Error(`No se pudieron guardar los usuarios del producto: ${detail}`)
+  }
+}
+
+export const createProducto = async (input: ProductoUpsertInput): Promise<Producto> => {
   const data = await toProductoData(input, 'create')
 
   const response = await fetch(`${BASE_URL}/api/productos`, {
@@ -694,6 +781,15 @@ export const createProducto = async (input: ProductoUpsertInput): Promise<void> 
     const detail = await parseStrapiErrorResponse(response)
     throw new Error(`No se pudo crear el producto: ${detail}`)
   }
+
+  const json = (await response.json()) as { data?: unknown }
+  const created = mapProducto(json.data)
+
+  if (created.id <= 0) {
+    throw new Error('El producto creado devolvió una respuesta inválida.')
+  }
+
+  return created
 }
 
 export const updateProducto = async (
