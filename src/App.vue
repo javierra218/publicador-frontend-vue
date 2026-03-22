@@ -14,13 +14,17 @@ const mobileNavOpen = ref(false)
 const showShell = computed(() => auth.isAuthenticated && route.name !== 'login')
 const userLabel = computed(() => auth.user?.email || auth.user?.username || 'Sesión activa')
 
-const navItems = [
+const navItems = computed(() =>
+  [
   { name: 'home', label: 'Home', icon: 'pi pi-home' },
   { name: 'productos-list', label: 'Listado', icon: 'pi pi-list' },
   { name: 'productos-create', label: 'Crear', icon: 'pi pi-plus' },
   { name: 'categorias-list', label: 'Categorías', icon: 'pi pi-tags' },
-  { name: 'ajustes-telegram', label: 'Ajustes', icon: 'pi pi-cog' },
-] as const
+  ...(auth.isFrontendAdmin
+    ? ([{ name: 'ajustes-telegram', label: 'Ajustes', icon: 'pi pi-cog' }] as const)
+    : []),
+  ] as const,
+)
 
 const isActive = (name: string) => {
   const currentRouteName = String(route.name ?? '')

@@ -89,6 +89,7 @@ const router = createRouter({
       component: () => import('@/views/AjustesTelegramView.vue'),
       meta: {
         requiresAuth: true,
+        requiresFrontendAdmin: true,
         title: 'Ajustes de Telegram',
       },
     },
@@ -124,6 +125,10 @@ router.beforeEach(async (to) => {
 
   const hasSession = await authStore.ensureSession()
   if (hasSession) {
+    if (to.meta.requiresFrontendAdmin && !authStore.isFrontendAdmin) {
+      return { name: 'home' }
+    }
+
     return true
   }
 

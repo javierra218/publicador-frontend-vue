@@ -64,11 +64,13 @@ export const loginWithStrapi = async (
     user?: unknown
   }
   const jwt = ensureString(payload.jwt)
-  const user = mapUser(payload.user)
+  const responseUser = mapUser(payload.user)
 
-  if (!jwt || user.id <= 0) {
+  if (!jwt || responseUser.id <= 0) {
     throw new Error('La respuesta de autenticación de Strapi es inválida.')
   }
+
+  const user = await fetchCurrentStrapiUser(jwt)
 
   return {
     jwt,
@@ -76,10 +78,14 @@ export const loginWithStrapi = async (
   }
 }
 
-export const fetchCurrentStrapiUser = async (): Promise<AuthUser> => {
-  const response = await fetch(`${strapiBaseUrl}/api/users/me?populate=role`, {
+export const fetchCurrentStrapiUser = async (jwtOverride?: string): Promise<AuthUser> => {
+  const response = await fetch(`${strapiBaseUrl}/api/frontend-session`, {
     headers: {
-      ...getStrapiAuthHeaders(),
+      ...(jwtOverride
+        ? {
+            Authorization: `Bearer ${jwtOverride}`,
+          }
+        : getStrapiAuthHeaders()),
     },
   })
 
@@ -88,11 +94,11 @@ export const fetchCurrentStrapiUser = async (): Promise<AuthUser> => {
     throw new Error(`No se pudo restaurar la sesión: ${detail}`)
   }
 
-  const payload = (await response.json()) as unknown
-  const user = mapUser(payload)
+  const payload = (await response.json()) as { data?: unknown }
+  const user = mapUser(payload.data)
 
   if (user.id <= 0) {
-    throw new Error('La respuesta de users/me es inválida.')
+    throw new Error('La respuesta de sesión es inválida.')
   }
 
   return user

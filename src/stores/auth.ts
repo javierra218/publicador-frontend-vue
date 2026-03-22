@@ -3,6 +3,7 @@ import { defineStore } from 'pinia'
 import { fetchCurrentStrapiUser, loginWithStrapi } from '@/services/auth'
 import {
   clearStoredAuthSession,
+  isFrontendAdminUser,
   readStoredAuthToken,
   readStoredAuthUser,
   writeStoredAuthSession,
@@ -26,6 +27,7 @@ export const useAuthStore = defineStore('auth', {
 
   getters: {
     isAuthenticated: (state) => Boolean(state.jwt && state.user),
+    isFrontendAdmin: (state) => isFrontendAdminUser(state.user),
   },
 
   actions: {
@@ -49,7 +51,7 @@ export const useAuthStore = defineStore('auth', {
         return false
       }
 
-      if (this.sessionChecked && this.user) {
+      if (this.sessionChecked && this.user?.role) {
         return true
       }
 

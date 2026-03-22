@@ -4,6 +4,8 @@ export type AuthRole = {
   type: string
 }
 
+export const FRONTEND_ADMIN_ROLE_TYPE = 'frontend-admin'
+
 export type AuthUser = {
   id: number
   username: string
@@ -12,6 +14,9 @@ export type AuthUser = {
   blocked: boolean
   role: AuthRole | null
 }
+
+export const isFrontendAdminUser = (user: AuthUser | null): boolean =>
+  user?.role?.type === FRONTEND_ADMIN_ROLE_TYPE
 
 export const AUTH_EXPIRED_EVENT = 'publicador:auth-expired'
 

@@ -6,9 +6,11 @@ import InputText from 'primevue/inputtext'
 import Message from 'primevue/message'
 
 import { fetchProductos } from '@/services/strapi'
+import { useAuthStore } from '@/stores/auth'
 import type { Producto } from '@/types/producto'
 
 const router = useRouter()
+const auth = useAuthStore()
 const productos = ref<Producto[]>([])
 const loading = ref(false)
 const error = ref('')
@@ -115,6 +117,7 @@ onMounted(loadProductos)
           @click="goToCategoriaCreate"
         />
         <Button
+          v-if="auth.isFrontendAdmin"
           label="Ajustes Telegram"
           icon="pi pi-cog"
           severity="secondary"
