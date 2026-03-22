@@ -8,7 +8,7 @@
   --text-main: var(--p-text-color, #f5f5f5);
   --text-soft: var(--p-text-muted-color, #a1a1aa);
   --line: var(--p-content-border-color, #3f3f46);
-  --accent: var(--p-primary-color, #60a5fa);
+  --accent: var(--p-primary-color, #f97316);
   --font-display: 'Bebas Neue', 'Impact', sans-serif;
 
   /* Compatibility tokens for views introduced later. */
